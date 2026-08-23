@@ -1,0 +1,139 @@
+%! Author = i_ser
+%! Date = 6/25/2026
+
+\documentclass[11pt, letterpaper]{article}
+\usepackage{amsmath}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+ \geometry{
+     letterpaper,
+     total={6.5in,9in},
+     left=1in,
+     top=1in,
+ }
+
+\title{PDE Solutions}
+\author{Ivan Sergienko}
+\date{\today}
+
+\begin{document}
+    \maketitle
+
+    \section{Equity Options}\label{sec:eq_opt}
+
+    We start with the standard Black-Scholes PDE:
+    \begin{equation}\label{eq:bs_pde_S}
+        U_t + \mathcal{L}_S(r, q, \sigma)U = U_t + \frac{\sigma^2 S^2}{2} U_{SS} + (r - q) S\, U_S - r U = 0
+    \end{equation}
+    We immediately switch to the log stock price $x = \ln (S/S_0)$, and reverse time $\tau = T -t$.
+    \begin{eqnarray}\label{eq:bs_pde}
+        U_\tau &=& \mathcal{L}_x(r, q, \sigma) U = \frac{\sigma^2}{2} U_{xx} + \left(r - q - \frac{\sigma^2}{2}\right) U_x - r U,\\
+        U(x, 0) &=& \max[I(S_0 e^x - K), 0],
+    \end{eqnarray}
+    where $I=1(-1)$ for Call(Put).
+
+    \section{Crank-Nicolson Method}\label{sec:cn_method}
+
+    Define the parabolic PDE:
+    \begin{equation}\label{eq:parabolic}
+        a u_{xx} + b u_x + c u - u_\tau = 0
+    \end{equation} 
+    It is parabolic beacause the determinant of the matrix of the second order derivatives is zero trivially since there
+    is no second derivatives involving $\tau$. 
+    The Crank-Nicolson method is a finite difference method that is implicit in time and second-order accurate in both space and time.
+
+    Given a grid of points $(x_i = x_{\min} + i h, \tau_j = j k)$, where $i = 0, 1, \ldots, M$ and $j = 0, 1, \ldots, N$,
+    we can approximate the derivatives in the PDE using finite differences centered exactly half way between the time steps. 
+    We define $u_i^j = u(x_i, \tau_j)$ for brevitiy, and
+
+    \begin{eqnarray}
+        u & = & 1 / 2 \left(u_i^{j+1} + u_i^j\right)\nonumber\\
+        u_\tau & = & 1 / k \left(u_i^{j+1} - u_i^j\right)\nonumber\\
+        u_x & = & 1/(4h) \left(u_{i+1}^j - u_{i-1}^j + u_{i+1}^{j+1} - u_{i-1}^{j+1}\right)\label{eq:ders}\\
+        u_{xx} & = & 1/(2h^2) \left(u_{i+1}^j - 2 u_i^j + u_{i-1}^j + u_{i+1}^{j+1} - 2 u_i^{j+1} + u_{i-1}^{j+1}\right)\nonumber
+    \end{eqnarray}
+
+    Substituting these approximations into the PDE \eqref{eq:parabolic} gives us a system of linear equations for $u_i^{j+1}$ at each time step.
+    
+    \begin{equation}
+        A_i u_{i-1}^{j+1} + B_i u_i^{j+1} + C_i u_{i+1}^{j+1} = D_i,
+    \end{equation}
+    where the coefficients $A_i$, $B_i$, $C_i$, and $D_i$ are defined as follows:
+    \begin{eqnarray}
+        A_i & = & 0.5\, k (a - 0.5\, b\, h)\nonumber\\
+        B_i & = & h^2 (0.5\, c\, k - 1) - k\,a,\nonumber\\
+        C_i & = & 0.5\, k (a + 0.5\, b\, h),\label{eq:coefficients}\\
+        D_i & = & -A_i u_{i-1}^j - (B_i + 2 h^2) u_i^j - C_i u_{i+1}^j\nonumber 
+    \end{eqnarray}
+    
+    The resulting system is tridiagonal, which allows for efficient numerical solution using methods such as the Thomas algorithm.
+
+    \section{Putting it all together}\label{sec:putting_together}
+    We need additional boundary conditions to solve the PDE. For a call (put) option, we can use the following:
+
+    \begin{eqnarray}
+        U(x_{\min(\max)}, \tau) & = & U_{0(N)}^j= 0,\\
+        U(x_{\max(\min)}, \tau) & = & U_{N(0)}^j = I(S_0 e^{x_{\max(\min)} - q\, k\, j} - K\, e^{-r\, k\, j}).
+    \end{eqnarray}
+
+    With these boundary conditions, we can refine the system \eqref{eq:coefficients} for $i = 1, N-1$
+    \begin{eqnarray}
+        D_1 & = & -A_1 (u_0^j + u_0^{j+1}) - (B_1 + 2 h^2) u_1^j - C_1 u_2^j\nonumber\\
+        D_{N-1} & = & -A_{N-1} u_{N-2}^j - (B_{N-1} + 2 h^2) u_{N-1}^j - C_{N-1} (u_N^j + u_N^{j+1})
+    \end{eqnarray}
+
+    \section{Greeks by PDE}
+
+    \subsection{Vega}
+    Differentiate the original PDE \eqref{eq:bs_pde_S} with respect to $\sigma$ to get the PDE for Vega, and define
+    $v = \partial U / \partial \sigma$:
+    \begin{equation}
+        \sigma S^2 U_{SS} + v_t + \mathcal{L}_S v = 0
+    \end{equation}
+    Using the same change of variables as before, we get the PDE for $v$ in terms of $U$:
+    \begin{eqnarray}
+        \mathcal{L}_x v - v_\tau &=& \sigma (U_x - U_{xx}),\nonumber\\
+        v(x, \tau = 0) &=& 0,\\
+        v(x_{\min, \max}, \tau) &=& 0.
+    \end{eqnarray}
+    Specifically, $U_{xx} (x_{\max(\min)}, \tau) = U_x (x_{\max(\min)}, \tau) = I\, S_0 e^{x_{\max(\min)} -q \tau}$
+    and $U_{xx}(x_{\min(\max)}, \tau) = U_x(x_{\min(\max)}, \tau) = 0$. Hence $U_x - U_{xx} = 0$ at the boundaries.
+
+    \subsection{Rho}
+    Defining $\rho = \partial U / \partial r$, and differentiating \eqref{eq:bs_pde_S} with respect to $r$, we get:
+    
+    \begin{equation}
+        S\, U_S - U + \rho_t + \mathcal{L}_S \rho = 0
+    \end{equation}
+    Using the same change of variables as before, we get the PDE for $\rho$ in terms of $U$:
+    \begin{eqnarray}
+        \mathcal{L}_x \rho - \rho_\tau &=& U - U_{x},\\
+        \rho(x, \tau = 0) &=& 0,\\
+        \rho(x_{\min(\max)}, \tau) &=& 0,\\
+        \rho(x_{\max(\min)}, \tau) & = & I\, \tau\, K\, e^{-r \tau}.
+    \end{eqnarray}
+
+
+    \section{Crank-Nicolson Again}
+    Discretise equation \eqref{eq:bs_pde} along the time axis $\tau_j = j k$
+    \begin{eqnarray}
+        U^{j+1} - U^j &=& \frac k  2 \mathcal{L}_x (U^{j+1} + U^j)\nonumber\\
+        \left(\mathcal{I} - \frac k  2 \mathcal{L}_x\right) U^{j+1} &=& \left(\mathcal{I} + \frac k  2 \mathcal{L}_x\right) U^j\label{eq:op_form}
+        % \mathcal{L}_x u_i^n = \frac{\sigma^2}{2} U_{xx} + \frac 1 2 \left(r - q - \frac{\sigma^2}{2}\right) U_x - r U
+    \end{eqnarray}
+
+    For the generic equation \eqref{eq:parabolic} we can write
+    \begin{equation}\label{eq:oper}
+        \mathcal{L}_x u_i^n = \frac {a}{h^2} (u_{i-1}^n - 2 u_i^n + u_{i+1}^n) + \frac{b}{2h} (u_{i+1}^n - u_{i-1}^n) + c u_{i}^n
+    \end{equation}
+
+    Combining \eqref{eq:op_form} and \eqref{eq:oper}, we get a tri-diagonal system of equations with:
+
+    \begin{eqnarray}
+        \text{diag} &=& 1 + \frac{k\, a}{h^2} - \frac{k\, c}{2} \nonumber\\
+        \text{lower} &=& -\frac{k}{2} \left(\frac {a}{h^2} - \frac{b}{2h} \right)\\
+        \text{upper} &=& -\frac{k}{2} \left(\frac {a}{h^2} + \frac{b}{2h} \right)\nonumber\\
+        \text{rhs} &=& (2 - \text{diag})\, u_i^j - \text{lower}\, u_{i-1}^j - \text{upper}\, u_{i+1}^j\nonumber
+    \end{eqnarray}
+
+\end{document}
