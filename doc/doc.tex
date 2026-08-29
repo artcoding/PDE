@@ -7,8 +7,8 @@
 \usepackage{geometry}
  \geometry{
      letterpaper,
-     total={6.5in,9in},
-     left=1in,
+     left=0.7in,
+     right=0.7in,
      top=1in,
  }
 
@@ -26,61 +26,112 @@
         U_t + \mathcal{L}_S(r, q, \sigma)U = U_t + \frac{\sigma^2 S^2}{2} U_{SS} + (r - q) S\, U_S - r U = 0
     \end{equation}
     We immediately switch to the log stock price $x = \ln (S/S_0)$, and reverse time $\tau = T -t$.
-    \begin{eqnarray}\label{eq:bs_pde}
-        U_\tau &=& \mathcal{L}_x(r, q, \sigma) U = \frac{\sigma^2}{2} U_{xx} + \left(r - q - \frac{\sigma^2}{2}\right) U_x - r U,\\
+    \begin{eqnarray}
+        U_\tau &=& \mathcal{L}_x(r, q, \sigma)\, U \label{eq:bs_pde}\\
+        &=& \frac{\sigma^2}{2} U_{xx} + \left(r - q - \frac{\sigma^2}{2}\right) U_x - r U,\label{eq:bs_pde_detail}\\
         U(x, 0) &=& \max[I(S_0 e^x - K), 0],
     \end{eqnarray}
     where $I=1(-1)$ for Call(Put).
 
-    \section{Crank-Nicolson Method}\label{sec:cn_method}
-
-    Define the parabolic PDE:
-    \begin{equation}\label{eq:parabolic}
-        a u_{xx} + b u_x + c u - u_\tau = 0
-    \end{equation} 
-    It is parabolic beacause the determinant of the matrix of the second order derivatives is zero trivially since there
-    is no second derivatives involving $\tau$. 
-    The Crank-Nicolson method is a finite difference method that is implicit in time and second-order accurate in both space and time.
-
-    Given a grid of points $(x_i = x_{\min} + i h, \tau_j = j k)$, where $i = 0, 1, \ldots, M$ and $j = 0, 1, \ldots, N$,
-    we can approximate the derivatives in the PDE using finite differences centered exactly half way between the time steps. 
-    We define $u_i^j = u(x_i, \tau_j)$ for brevitiy, and
-
-    \begin{eqnarray}
-        u & = & 1 / 2 \left(u_i^{j+1} + u_i^j\right)\nonumber\\
-        u_\tau & = & 1 / k \left(u_i^{j+1} - u_i^j\right)\nonumber\\
-        u_x & = & 1/(4h) \left(u_{i+1}^j - u_{i-1}^j + u_{i+1}^{j+1} - u_{i-1}^{j+1}\right)\label{eq:ders}\\
-        u_{xx} & = & 1/(2h^2) \left(u_{i+1}^j - 2 u_i^j + u_{i-1}^j + u_{i+1}^{j+1} - 2 u_i^{j+1} + u_{i-1}^{j+1}\right)\nonumber
-    \end{eqnarray}
-
-    Substituting these approximations into the PDE \eqref{eq:parabolic} gives us a system of linear equations for $u_i^{j+1}$ at each time step.
-    
+    \section{Solving the PDE}\label{sec:solving_pde}
+    We now discretise equation \eqref{eq:bs_pde} along the time axis in equal intervals of size $k$, $\tau_j = j\, k$,
+    where $j = 0, 1, \ldots, N$ and $T=k\, N$.
+    We approximate the time derivative using a forward difference:
     \begin{equation}
-        A_i u_{i-1}^{j+1} + B_i u_i^{j+1} + C_i u_{i+1}^{j+1} = D_i,
+        U_{\tau_j} \approx \frac{U^{j+1} - U^j}{k}
     \end{equation}
-    where the coefficients $A_i$, $B_i$, $C_i$, and $D_i$ are defined as follows:
-    \begin{eqnarray}
-        A_i & = & 0.5\, k (a - 0.5\, b\, h)\nonumber\\
-        B_i & = & h^2 (0.5\, c\, k - 1) - k\,a,\nonumber\\
-        C_i & = & 0.5\, k (a + 0.5\, b\, h),\label{eq:coefficients}\\
-        D_i & = & -A_i u_{i-1}^j - (B_i + 2 h^2) u_i^j - C_i u_{i+1}^j\nonumber 
-    \end{eqnarray}
+    where $U^j = U(x, \tau_j)$.
     
-    The resulting system is tridiagonal, which allows for efficient numerical solution using methods such as the Thomas algorithm.
+    We will need two discretization schemes for the spatial derivatives: the explicit Euler scheme and the implicit Crank-Nicolson.
+    The former will be applied for the first few (four) steps to avoid unstable greeks due to the singularity of the second derivative
+    at $\tau = 0$. The latter will be used for the rest of the time steps to ensure stability and accuracy.
 
-    \section{Putting it all together}\label{sec:putting_together}
-    We need additional boundary conditions to solve the PDE. For a call (put) option, we can use the following:
+    First, it is useful to rewrite the linear operator in a generic form:
+    \begin{equation}\label{eq:generic_pde}
+        \mathcal{L}_x\, U = a\, U_{xx} + b\, U_x + c\, U,
+    \end{equation}
+    where $a = 0.5\, \sigma^2$, $b = r - q - a$, and $c = -r$.
+
+    We now discretize the spatial dimension into $M$ intervals of size $h$, $x_i = x_{\min} + i h$, where $i = 0, 1, \ldots, M$.
+    We define $U_i^j = U(x_i, \tau_j)$, and
 
     \begin{eqnarray}
-        U(x_{\min(\max)}, \tau) & = & U_{0(N)}^j= 0,\\
-        U(x_{\max(\min)}, \tau) & = & U_{N(0)}^j = I(S_0 e^{x_{\max(\min)} - q\, k\, j} - K\, e^{-r\, k\, j}).
+        U_{x} & \approx & \frac{1}{2h} \left(U_{i+1}^j - U_{i-1}^j\right) \label{eq:ders}\\
+        U_{xx} & \approx & \frac{1}{h^2} \left(U_{i+1}^j - 2 U_i^j + U_{i-1}^j\right)\nonumber
     \end{eqnarray}
 
-    With these boundary conditions, we can refine the system \eqref{eq:coefficients} for $i = 1, N-1$
-    \begin{eqnarray}
-        D_1 & = & -A_1 (u_0^j + u_0^{j+1}) - (B_1 + 2 h^2) u_1^j - C_1 u_2^j\nonumber\\
-        D_{N-1} & = & -A_{N-1} u_{N-2}^j - (B_{N-1} + 2 h^2) u_{N-1}^j - C_{N-1} (u_N^j + u_N^{j+1})
-    \end{eqnarray}
+    We can now define completely the discretized operator $\mathcal{L}_x$:
+    % \begin{equation}
+    %     \mathcal{L}_x\, U_i^j = a\, \frac{U_{i+1}^j - 2 U_i^j + U_{i-1}^j}{h^2} + b\, \frac{U_{i+1}^j - U_{i-1}^j}{2h} + c\, U_i^j
+    % \end{equation}
+
+    \begin{equation}\label{eq:operator}
+        \mathcal{L}_x\, U_i^j = \left(\frac{a}{h^2} + \frac{b}{2h}\right) U_{i+1}^j + \left(c - \frac{2a}{h^2}\right) U_i^j + \left(\frac{a}{h^2} - \frac{b}{2h}\right) U_{i-1}^j
+    \end{equation}
+
+        \subsection{Euler Scheme}\label{sec:euler_scheme}
+        In this scheme, equation \eqref{eq:generic_pde} is evaluated at time step $\tau_j$.
+        Therefore, the solution of \eqref{eq:bs_pde} at time $\tau_{j+1}$ is simply:
+        \begin{eqnarray}
+            U_i^{j+1} &\approx& U_i^j + k\, \mathcal{L}_x\, U_i^j \nonumber\\
+            &\approx& k \left(\frac{a}{h^2} + \frac{b}{2h}\right) U_{i+1}^j + \left[1 + k\left(c - \frac{2a}{h^2}\right)\right] U_i^j + k \left(\frac{a}{h^2} - \frac{b}{2h}\right) U_{i-1}^j
+        \end{eqnarray}
+
+        \subsection{Crank-Nicolson Method}\label{sec:cn_method}
+        In the Crank-Nicolson scheme, we place the operator $\mathcal{L}_x$ at the midpoint between time steps $\tau_j$ and $\tau_{j+1}$.
+        Equation \eqref{eq:bs_pde} is then approximated as a linear system of equations for $U^{j+1}$:
+        \begin{eqnarray}
+            \frac{U^{j+1} - U^j}{k} &=& \frac 1 2 \mathcal{L}_x (U^{j+1} + U^j)\nonumber\\
+            \left(\mathcal{I} - \frac k  2 \mathcal{L}_x\right) U^{j+1} &=& \left(\mathcal{I} + \frac k  2 \mathcal{L}_x\right) U^j\label{eq:op_form}
+        \end{eqnarray}
+
+        Using the operator definition \eqref{eq:operator}, we get a tri-diagonal system of equations with:
+        \begin{equation}
+            \text{lower}\cdot U_{i-1}^{j+1} + \text{diag}\cdot U_i^{j+1} + \text{upper}\cdot U_{i+1}^{j+1} = \text{rhs}_i^j,
+        \end{equation}
+        where the coefficients are defined as follows:
+        \begin{eqnarray}
+            \text{diag} &=& 1 + \frac{k\, a}{h^2} - \frac{k\, c}{2} \nonumber\\
+            \text{lower} &=& -\frac{k}{2} \left(\frac {a}{h^2} - \frac{b}{2h} \right)\\
+            \text{upper} &=& -\frac{k}{2} \left(\frac {a}{h^2} + \frac{b}{2h} \right)\nonumber\\
+            \text{rhs}_i^j &=& - \text{lower}\cdot U_{i-1}^j + (2 - \text{diag})\cdot U_i^j - \text{upper}\cdot U_{i+1}^j\nonumber
+        \end{eqnarray}
+
+        \subsection{Boundary Conditions}
+
+        Solving the PDE requires two types of boundary conditions: the payoff function at maturity, and the conditions at the edges of the spatial domain. 
+        Depending on the option type, we have the following payoff functions at maturity.
+
+        \textbf{European Call}:
+        \begin{eqnarray}
+            U(x_i, 0) &=& U_{i}^0 = \max \left[S_0 \exp(x_i) - K, 0\right]\nonumber\\
+            U(x_0, \tau_j) & = & U_0^j= 0,\\
+            U(x_N, \tau_j) & = & U_{N}^j = S_0\, \exp(x_N - q\, \tau_j) - K\, \exp(-r\, \tau_j).\nonumber
+        \end{eqnarray}
+
+        \textbf{European Put}:
+        \begin{eqnarray}
+            U(x_i, 0) &=& U_{i}^0 = \max \left[K - S_0 \exp(x_i), 0\right]\nonumber\\
+            U(x_0, \tau_j) & = & U_0^j =  K\, \exp(-r\, \tau_j) - S_0\, \exp(x_0 - q\, \tau_j),\\
+            U(x_N, \tau_j) & = & U_{N}^j = 0.\nonumber
+        \end{eqnarray}
+
+        \textbf{American Call}:
+        \begin{eqnarray}
+            U(x_i, 0) &=& U_{i}^0 = \max \left[S_0 \exp(x_i) - K, 0\right]\nonumber\\
+            U(x_0, \tau_j) & = & U_0^j= 0,\\
+            U(x_i, \tau_j) & = & U_i^j = \ge S_0 \exp(x_i) - K.\nonumber
+        \end{eqnarray}
+        
+        \textbf{American Put}:
+        \begin{eqnarray}
+            U(x_i, 0) &=& U_{i}^0 = \max \left[K - S_0 \exp(x_i), 0\right]\nonumber\\
+            U(x_N, \tau_j) & = & U_{N}^j = 0,\\
+            U(x_i, \tau_j) & = & U_i^j = \ge K - S_0 \exp(x_i).\nonumber
+        \end{eqnarray}
+
+        The inequality conditions simply mean that at each time steps we need to check if the solution is below
+        the intrinsic value, and if so, replace it with the intrinsic value.
 
     \section{Greeks by PDE}
 
@@ -111,29 +162,6 @@
         \rho(x, \tau = 0) &=& 0,\\
         \rho(x_{\min(\max)}, \tau) &=& 0,\\
         \rho(x_{\max(\min)}, \tau) & = & I\, \tau\, K\, e^{-r \tau}.
-    \end{eqnarray}
-
-
-    \section{Crank-Nicolson Again}
-    Discretise equation \eqref{eq:bs_pde} along the time axis $\tau_j = j k$
-    \begin{eqnarray}
-        U^{j+1} - U^j &=& \frac k  2 \mathcal{L}_x (U^{j+1} + U^j)\nonumber\\
-        \left(\mathcal{I} - \frac k  2 \mathcal{L}_x\right) U^{j+1} &=& \left(\mathcal{I} + \frac k  2 \mathcal{L}_x\right) U^j\label{eq:op_form}
-        % \mathcal{L}_x u_i^n = \frac{\sigma^2}{2} U_{xx} + \frac 1 2 \left(r - q - \frac{\sigma^2}{2}\right) U_x - r U
-    \end{eqnarray}
-
-    For the generic equation \eqref{eq:parabolic} we can write
-    \begin{equation}\label{eq:oper}
-        \mathcal{L}_x u_i^n = \frac {a}{h^2} (u_{i-1}^n - 2 u_i^n + u_{i+1}^n) + \frac{b}{2h} (u_{i+1}^n - u_{i-1}^n) + c u_{i}^n
-    \end{equation}
-
-    Combining \eqref{eq:op_form} and \eqref{eq:oper}, we get a tri-diagonal system of equations with:
-
-    \begin{eqnarray}
-        \text{diag} &=& 1 + \frac{k\, a}{h^2} - \frac{k\, c}{2} \nonumber\\
-        \text{lower} &=& -\frac{k}{2} \left(\frac {a}{h^2} - \frac{b}{2h} \right)\\
-        \text{upper} &=& -\frac{k}{2} \left(\frac {a}{h^2} + \frac{b}{2h} \right)\nonumber\\
-        \text{rhs} &=& (2 - \text{diag})\, u_i^j - \text{lower}\, u_{i-1}^j - \text{upper}\, u_{i+1}^j\nonumber
     \end{eqnarray}
 
 \end{document}
