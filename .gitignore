@@ -1,2 +1,6 @@
 /.idea/*
-*.pyc
+doc/*.pyc
+doc/*.aux
+doc/*.log
+doc/*.pdf
+doc/*.gz
