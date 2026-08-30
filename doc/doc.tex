@@ -26,12 +26,20 @@
         U_t + \mathcal{L}_S(r, q, \sigma)U = U_t + \frac{\sigma^2 S^2}{2} U_{SS} + (r - q) S\, U_S - r U = 0
     \end{equation}
     We immediately switch to the log stock price $x = \ln (S/S_0)$, and reverse time $\tau = T -t$.
+
+    \begin{eqnarray}
+        U_S &=& U_x / S \nonumber\\
+        U_{SS} &=& (U_{xx} - U_x) / S^2\\
+        U_t &=& -U_\tau \nonumber
+    \end{eqnarray}
+
+    In the new coordinates, the PDE \eqref{eq:bs_pde_S} becomes:
     \begin{eqnarray}
         U_\tau &=& \mathcal{L}_x(r, q, \sigma)\, U \label{eq:bs_pde}\\
-        &=& \frac{\sigma^2}{2} U_{xx} + \left(r - q - \frac{\sigma^2}{2}\right) U_x - r U,\label{eq:bs_pde_detail}\\
-        U(x, 0) &=& \max[I(S_0 e^x - K), 0],
+        &=& \frac{\sigma^2}{2} U_{xx} + \left(r - q - \frac{\sigma^2}{2}\right) U_x - r U.\label{eq:bs_pde_detail}
+        % U(x, 0) &=& \max[I(S_0 e^x - K), 0],
     \end{eqnarray}
-    where $I=1(-1)$ for Call(Put).
+    % where $I=1(-1)$ for Call(Put).
 
     \section{Solving the PDE}\label{sec:solving_pde}
     We now discretise equation \eqref{eq:bs_pde} along the time axis in equal intervals of size $k$, $\tau_j = j\, k$,
@@ -48,9 +56,9 @@
 
     First, it is useful to rewrite the linear operator in a generic form:
     \begin{equation}\label{eq:generic_pde}
-        \mathcal{L}_x\, U = a\, U_{xx} + b\, U_x + c\, U,
+        \mathcal{L}_x\, U = a_0\, U + a_1\, U_x + a_2\, U_{xx},
     \end{equation}
-    where $a = 0.5\, \sigma^2$, $b = r - q - a$, and $c = -r$.
+    where $a_2 = 0.5\, \sigma^2$, $a_1 = r - q - a_2$, and $a_0 = -r$.
 
     We now discretize the spatial dimension into $M$ intervals of size $h$, $x_i = x_{\min} + i h$, where $i = 0, 1, \ldots, M$.
     We define $U_i^j = U(x_i, \tau_j)$, and
@@ -61,12 +69,9 @@
     \end{eqnarray}
 
     We can now define completely the discretized operator $\mathcal{L}_x$:
-    % \begin{equation}
-    %     \mathcal{L}_x\, U_i^j = a\, \frac{U_{i+1}^j - 2 U_i^j + U_{i-1}^j}{h^2} + b\, \frac{U_{i+1}^j - U_{i-1}^j}{2h} + c\, U_i^j
-    % \end{equation}
 
     \begin{equation}\label{eq:operator}
-        \mathcal{L}_x\, U_i^j = \left(\frac{a}{h^2} + \frac{b}{2h}\right) U_{i+1}^j + \left(c - \frac{2a}{h^2}\right) U_i^j + \left(\frac{a}{h^2} - \frac{b}{2h}\right) U_{i-1}^j
+        \mathcal{L}_x\, U_i^j = \left(\frac{a_2}{h^2} + \frac{a_1}{2h}\right) U_{i+1}^j + \left(a_0 - \frac{2a_2}{h^2}\right) U_i^j + \left(\frac{a_2}{h^2} - \frac{a_1}{2h}\right) U_{i-1}^j
     \end{equation}
 
         \subsection{Euler Scheme}\label{sec:euler_scheme}
@@ -74,7 +79,7 @@
         Therefore, the solution of \eqref{eq:bs_pde} at time $\tau_{j+1}$ is simply:
         \begin{eqnarray}
             U_i^{j+1} &\approx& U_i^j + k\, \mathcal{L}_x\, U_i^j \nonumber\\
-            &\approx& k \left(\frac{a}{h^2} + \frac{b}{2h}\right) U_{i+1}^j + \left[1 + k\left(c - \frac{2a}{h^2}\right)\right] U_i^j + k \left(\frac{a}{h^2} - \frac{b}{2h}\right) U_{i-1}^j
+            &\approx& k \left(\frac{a_2}{h^2} + \frac{a_1}{2h}\right) U_{i+1}^j + \left[1 + k\left(a_0 - \frac{2a_2}{h^2}\right)\right] U_i^j + k \left(\frac{a_2}{h^2} - \frac{a_1}{2h}\right) U_{i-1}^j
         \end{eqnarray}
 
         \subsection{Crank-Nicolson Method}\label{sec:cn_method}
@@ -91,9 +96,9 @@
         \end{equation}
         where the coefficients are defined as follows:
         \begin{eqnarray}
-            \text{diag} &=& 1 + \frac{k\, a}{h^2} - \frac{k\, c}{2} \nonumber\\
-            \text{lower} &=& -\frac{k}{2} \left(\frac {a}{h^2} - \frac{b}{2h} \right)\\
-            \text{upper} &=& -\frac{k}{2} \left(\frac {a}{h^2} + \frac{b}{2h} \right)\nonumber\\
+            \text{diag} &=& 1 + \frac{k\, a_2}{h^2} - \frac{k\, a_0}{2} \nonumber\\
+            \text{lower} &=& -\frac{k}{2} \left(\frac {a_2}{h^2} - \frac{a_1}{2h} \right)\\
+            \text{upper} &=& -\frac{k}{2} \left(\frac {a_2}{h^2} + \frac{a_1}{2h} \right)\nonumber\\
             \text{rhs}_i^j &=& - \text{lower}\cdot U_{i-1}^j + (2 - \text{diag})\cdot U_i^j - \text{upper}\cdot U_{i+1}^j\nonumber
         \end{eqnarray}
 

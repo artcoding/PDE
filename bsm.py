@@ -30,7 +30,8 @@ def bsm_value(opt: Option, mkt: Market, calc_greeks: bool = False):
         delta = sign * norm.cdf(sign * d1) * exp(-mkt.q * opt.ttm)
         vega = mkt.spot * exp(-mkt.q * opt.ttm) * norm.pdf(d1) * sqrt(opt.ttm)
         rho = sign * opt.ttm * opt.strike * exp(-mkt.r * opt.ttm) * norm.cdf(sign * d2)
-        greeks = {'delta': delta, 'vega': vega, 'rho': rho}
+        gamma = norm.pdf(d1) * exp(-mkt.q * opt.ttm) / (mkt.spot * mkt.vol * sqrt(opt.ttm))
+        greeks = {'delta': delta, 'vega': vega, 'rho': rho, 'gamma': gamma}
 
     return fv * disc, greeks
     

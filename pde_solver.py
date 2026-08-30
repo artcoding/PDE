@@ -62,21 +62,21 @@ class PDESolver:
 
     def _setup(self):
         self._x_grid = np.linspace(self.x_domain[0], self.x_domain[1], self.x_steps + 1)
+        # Space step
+        h = self._x_grid[1] - self._x_grid[0]
 
         # Time step
         k = self.T / self.t_steps
-        # Space step
-        h = self._x_grid[1] - self._x_grid[0]
 
         kah2 = k * self.a[2] / h / h
         kb4h = 0.25 * k * self.a[1] / h
 
-        self._m = TriagMatrix()
-
-        self._m.diag  = np.full(self.t_steps - 1, 1 + kah2 - 0.5 * k * self.a[0])
-        self._m.lower = np.full(self.t_steps - 1, -0.5 * kah2 + kb4h)
-        self._m.upper = np.full(self.t_steps - 1, -0.5 * kah2 - kb4h)
-
+        mat_size = self.t_steps - 1
+        self._m = TriagMatrix(
+            diag=np.full(mat_size, 1 + kah2 - 0.5 * k * self.a[0]),
+            lower=np.full(mat_size, -0.5 * kah2 + kb4h),
+            upper=np.full(mat_size, -0.5 * kah2 - kb4h)
+        )
 
     def _matrix_rhs(self):
 
@@ -113,12 +113,12 @@ class PDESolver:
         return self._u
          
 
-if __name__ == '__main__':
-    solver = PDESolver(
-        a = (1,1,1),
-        x_domain=(0, 1),
-        T = 1,
-    )
+# if __name__ == '__main__':
+#     solver = PDESolver(
+#         a = (1,1,1),
+#         x_domain=(0, 1),
+#         T = 1,
+#     )
 
-    solver.solve()
+#     solver.solve()
     
