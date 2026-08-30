@@ -27,3 +27,24 @@ class Option:
             return np.maximum(self.strike - spot, 0.0)
         else:
             raise ValueError("Invalid option type. Use 'C' for Call or 'P' for Put.")
+
+    def can_exercise(self, t_tm: float) -> bool:
+        """
+        Check if the option can be exercised at time t.
+
+        Parameters:
+        t_tm : float
+            Time to maturity (in years).
+
+        Returns:
+        bool
+            True if the option can be exercised, False otherwise.
+        """
+
+        if self.exercise == 'E':
+            return t_tm <= 0.0
+
+        if self.exercise == 'A':
+            return True
+        
+        raise ValueError("Invalid exercise type. Must be 'E' for European or 'A' for American.")

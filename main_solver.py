@@ -26,7 +26,7 @@ def plot(spots, pvs, payoff, delta, gamma, max_spot=None):
 
 def main():
     # Define the option and market parameters
-    opt = Option(exercise='E', type='C', ttm=1, strike=90.0)
+    opt = Option(exercise='A', type='P', ttm=1, strike=90.0)
     mkt = Market(spot=100, r=0.05, q=0.02, vol=0.4)
 
     # Define log S PDE coefficients
@@ -46,6 +46,8 @@ def main():
     def upper_b(x, t):
         return mkt.spot * np.exp(x - mkt.q * t) - opt.strike * np.exp(-mkt.r * t) if opt.type == 'C' else 0.0
 
+    def early_exercise(t):
+        return opt.can_exercise(t)
 
     solver = PDESolver(
         a=(pde_c, pde_b, pde_a),        # Tuple of coefficients.
@@ -54,7 +56,8 @@ def main():
         
         initial=euro_log_payoff,        # Function of x
         lower_boundary=lower_b,         # Function of t
-        upper_boundary=upper_b          # Function of t
+        upper_boundary=upper_b,         # Function of t
+        is_exer_time=early_exercise     # Function of t
     )
 
     solver.solve()

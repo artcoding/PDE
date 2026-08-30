@@ -35,6 +35,7 @@ class PDESolver:
     initial: Callable               # Function of x
     lower_boundary: Callable        # Function of x, t
     upper_boundary: Callable        # Function of x, t
+    is_exer_time: Callable          # Function of t
 
     # Optional grid set up
     t_steps: int = 500
@@ -94,7 +95,8 @@ class PDESolver:
             self._setup()
         
         dt = self.T / self.t_steps
-        self._u = self.initial(self._x_grid)
+        intrinsic = self.initial(self._x_grid)
+        self._u = intrinsic.copy()
 
         tau = 0
         # Euler steps first
@@ -102,6 +104,8 @@ class PDESolver:
             tau += 0.5 * dt
             u_next = self._init_next(tau)
             u_next[1:-1] = self._matrix_rhs()
+            if self.is_exer_time(tau):
+                u_next = np.maximum(u_next, intrinsic)
             self._u = u_next
 
         # Crank-Nicolson steps
@@ -114,6 +118,8 @@ class PDESolver:
             rhs[-1] -= self._m.upper[0] * u_next[-1]
 
             u_next[1:-1] = solve_tridiag(self._m.lower, self._m.diag, self._m.upper, rhs)
+            if self.is_exer_time(tau):
+                u_next = np.maximum(u_next, intrinsic)
             self._u = u_next
     
     def solution(self):
