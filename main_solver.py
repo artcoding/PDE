@@ -34,7 +34,6 @@ def main():
     pde_b = mkt.r - mkt.q - pde_a
     pde_c = -mkt.r
 
-    # x0 = np.log(mkt.spot)
     x0 = 0
     dx = 5 * mkt.vol * np.sqrt(opt.ttm)
 

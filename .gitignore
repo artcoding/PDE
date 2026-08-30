@@ -4,3 +4,4 @@ doc/*.aux
 doc/*.log
 doc/*.pdf
 doc/*.gz
+__pycache__/*

@@ -21,7 +21,7 @@ class PDESolver:
     u_t = a_0 u + a_1 u_x + a_2 u_xx
 
     on domain [x_min...x_max, 0...T] 
-    with inital condiotion              u(x, 0) = initial(x)
+    with inital condition               u(x, 0) = initial(x)
     and Dirichlet boundary conditions   u(x_min, t) = lower_boundary(t)
                                         u(x_min, t) = upper_boundary(t)
 
@@ -37,8 +37,9 @@ class PDESolver:
     upper_boundary: Callable        # Function of x, t
 
     # Optional grid set up
-    t_steps: int = 100
-    x_steps: int = 100
+    t_steps: int = 500
+    x_steps: int = 500
+    euler_half_steps: int = 4
 
     # Internal variables
 
@@ -58,7 +59,7 @@ class PDESolver:
         assert(len(self.a) == 3)
         assert(self.x_domain[0] < self.x_domain[1])
         assert(self.T > 0)
-
+        assert(self.euler_half_steps % 2 == 0)
 
     def _setup(self):
         self._x_grid = np.linspace(self.x_domain[0], self.x_domain[1], self.x_steps + 1)
@@ -78,47 +79,42 @@ class PDESolver:
             upper=np.full(mat_size, -0.5 * kah2 - kb4h)
         )
 
-    def _matrix_rhs(self):
+    def _init_next(self, t: float) -> np.ndarray:
+        u = np.zeros_like(self._u)
+        u[0]  = self.lower_boundary(self._x_grid[0], t)
+        u[-1] = self.upper_boundary(self._x_grid[-1], t)
+        return u
 
+    def _matrix_rhs(self):
         rhs = (2 - self._m.diag[0]) * self._u[1:-1] - self._m.lower[0] * self._u[:-2] - self._m.upper[0] * self._u[2:]
         return rhs        
 
-
     def solve(self): 
-
         if self._x_grid is None:
             self._setup()
         
         dt = self.T / self.t_steps
-
         self._u = self.initial(self._x_grid)
 
-        t = 0
-        for _ in range(self.t_steps):
-            t += dt
+        tau = 0
+        # Euler steps first
+        for _ in range(self.euler_half_steps):
+            tau += 0.5 * dt
+            u_next = self._init_next(tau)
+            u_next[1:-1] = self._matrix_rhs()
+            self._u = u_next
 
-            u_next = np.zeros_like(self._u)
-            u_next[0]  = self.lower_boundary(self._x_grid[0], t)
-            u_next[-1] = self.upper_boundary(self._x_grid[-1], t)
+        # Crank-Nicolson steps
+        for _ in range(self.t_steps - self.euler_half_steps // 2):
+            tau += dt
 
+            u_next = self._init_next(tau)
             rhs = self._matrix_rhs()
             rhs[0]  -= self._m.lower[0] * u_next[0]
             rhs[-1] -= self._m.upper[0] * u_next[-1]
 
             u_next[1:-1] = solve_tridiag(self._m.lower, self._m.diag, self._m.upper, rhs)
-
             self._u = u_next
     
     def solution(self):
         return self._u
-         
-
-# if __name__ == '__main__':
-#     solver = PDESolver(
-#         a = (1,1,1),
-#         x_domain=(0, 1),
-#         T = 1,
-#     )
-
-#     solver.solve()
-    
